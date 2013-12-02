@@ -131,6 +131,9 @@ namespace MadsKristensen.EditorExtensions
 
         public static string GetTypeScriptValue(string type)
         {
+            // Remove ? from nullable field names
+            type = type.Replace("?", "");
+
             // First check if the type is a primative type. If so convert to TS type and return.
             var basicConvert = ConvertTypeScriptType(type);
             if (basicConvert != null)
