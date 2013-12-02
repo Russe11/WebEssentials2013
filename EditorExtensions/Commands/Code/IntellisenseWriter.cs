@@ -155,7 +155,9 @@ namespace MadsKristensen.EditorExtensions
                     }
                     else
                     {
-                        return "Array<" + match.Groups["name"].Value + ">";
+                        var split = match.Groups["type"].Value.Split('.');
+                        type = split[split.Length-1];
+                        return "Array<" + type + ">";
                     }
                 }
             }
