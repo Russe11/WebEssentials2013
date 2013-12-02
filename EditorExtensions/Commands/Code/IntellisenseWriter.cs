@@ -31,10 +31,11 @@ namespace MadsKristensen.EditorExtensions
 
                 foreach (var p in io.Properties)
                 {
-                    string value = GetValue(p.Type);
+                    string value = GetJavascriptValue(p.Type);
                     string comment = p.Summary ?? "The " + p.Name + " property as defined in " + io.FullName;
                     comment = Regex.Replace(comment, @"\s*[\r\n]+\s*", " ").Trim();
-                    sb.AppendLine("\t/// <field name=\"" + p.Name + "\" type=\"" + value + "\">" + SecurityElement.Escape(comment) + "</field>");
+                    sb.AppendLine("\t/// <field name=\"" + p.Name + "\" type=\"" + value + "\">" +
+                                  SecurityElement.Escape(comment) + "</field>");
                     sb.AppendLine("\tthis." + p.Name + " = new " + value + "();");
                 }
 
@@ -50,11 +51,31 @@ namespace MadsKristensen.EditorExtensions
 
             foreach (IntellisenseObject io in objects)
             {
-                sb.AppendLine("\tinterface " + io.Name + "{");
+                // Check to see if the class type is generic<>
+                var genericType = Regex.Match(io.FullName, @"<(?<genericType>.*?)>\Z");
+
+                if (genericType.Success)
+                {
+                    var t = genericType.Groups["genericType"].Value;
+
+                    var typeCheck = ConvertTypeScriptType(t);
+
+                    if (typeCheck != null)
+                    {
+                        t = typeCheck;
+                    }
+
+
+                    sb.AppendLine("\tinterface " + io.Name + "<" + t + "> {");
+                }
+                else
+                {
+                    sb.AppendLine("\tinterface " + io.Name + "{");
+                }
 
                 foreach (var p in io.Properties)
                 {
-                    string value = GetValue(p.Type);
+                    string value = GetTypeScriptValue(p.Type);
                     sb.AppendLine("\t\t" + p.Name + ": " + value + ";");
                 }
 
@@ -78,7 +99,7 @@ namespace MadsKristensen.EditorExtensions
             //}
         }
 
-        public static string GetValue(string type)
+        public static string GetJavascriptValue(string type)
         {
             switch (type.ToLowerInvariant())
             {
@@ -107,7 +128,98 @@ namespace MadsKristensen.EditorExtensions
 
             return "Object";
         }
+
+        public static string GetTypeScriptValue(string type)
+        {
+            // First check if the type is a primative type. If so convert to TS type and return.
+            var basicConvert = ConvertTypeScriptType(type);
+            if (basicConvert != null)
+            {
+                return basicConvert;
+;           }
+
+            // Next is it a collection or Array 
+            if (type.Contains("System.Collections") || type.Contains("Array"))
+            {
+                var match = Regex.Match(type, @"\.(?<name>[a-zA-Z]{1,}?)<(?<type>.+?)>\Z");
+
+                if (match.Success)
+                {
+                    var typeMatch = match.Groups["type"].Value;
+
+                    var typeCheck = ConvertTypeScriptType(typeMatch);
+
+                    if (typeCheck != null)
+                    {
+                        return "Array<" + typeCheck + ">";
+                    }
+                    else
+                    {
+                        return "Array<" + match.Groups["name"].Value + ">";
+                    }
+                }
+            }
+
+            // Is it a [] array
+            if (type.Contains("[]"))
+            {
+                var match = Regex.Match(type, @"(?<type>[a-zA-Z]{1,}?)\[\]\Z").Groups["type"].Value;
+                return "Array<" + match + ">";
+            }
+
+            // Is the type a generic class reference
+            var genericMatch = Regex.Match(type, @"(?<name>[a-zA-Z]{1,}?)<(?<type>.+?)>\Z");
+            if (genericMatch.Success)
+            {
+                var t = genericMatch.Groups["type"].Value;
+
+                var convertedType = ConvertTypeScriptType(t);
+
+                if (convertedType == null)
+                {
+                    return genericMatch.Value;
+                }
+                else
+                {
+                    return genericMatch.Groups["name"].Value + "<" + convertedType + ">";
+                }
+            }
+
+
+            return Regex.Match(type, @"(?<type>[a-zA-Z]{1,}?)\Z").Groups["type"].Value;
+        }
+
+        public static string ConvertTypeScriptType(string type)
+        {
+            switch (
+            type.ToLowerInvariant())
+            {
+                case "int":
+                case "int32":
+                case "int64":
+                case "long":
+                case "double":
+                case "float":
+                case "decimal":
+                    return "Number"
+                ;
+
+                case "system.datetime":
+                    return "Date";
+
+                case "string":
+                    return "String";
+
+                case "bool":
+                case "boolean":
+                    return "Boolean";
+            }
+
+            return null;
+        }
     }
+
+
 
     public class IntellisenseObject
     {
