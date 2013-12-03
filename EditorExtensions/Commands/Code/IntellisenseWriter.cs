@@ -218,6 +218,9 @@ namespace MadsKristensen.EditorExtensions
                 case "bool":
                 case "boolean":
                     return "Boolean";
+
+                case "object":
+                    return "Object";
             }
 
             return null;
